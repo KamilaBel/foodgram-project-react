@@ -3,6 +3,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueTogetherValidator
 
+from recipes.serializers_common import RecipeShortSerializer
 from users.models import Follow, User
 
 
@@ -39,12 +40,7 @@ class UserSubscriptionSerializer(UserSerializer):
         fields = UserSerializer.Meta.fields + ('recipes', 'recipes_count')
 
     def get_recipes(self, obj):
-        # Это сделано, чтобы не было циклического импорта:
-        # users.serializers и recipes.serializers взаимно зависят друг от друга
-        from recipes.serializers import RecipeShortSerializer
-
         request = self.context.get('request')
-
         recipes = obj.recipes.all()
         recipes_limit = request.query_params.get('recipes_limit')
         if recipes_limit is not None:

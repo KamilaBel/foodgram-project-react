@@ -11,7 +11,9 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", 'django-insecure-lnb2pp@^t%*_&6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = bool(int(os.environ.get("DJANGO_DEBUG") or 0))
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [host
+                 for host
+                 in os.environ.get("ALLOWED_HOSTS", "*").split(',')]
 
 AUTH_USER_MODEL = 'users.User'
 
