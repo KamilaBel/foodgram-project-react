@@ -1,9 +1,8 @@
-from collections import defaultdict
-
 from django.contrib.admin import display
 from django.core.validators import MinValueValidator
 from django.db import models
-from django.db.models import Exists, OuterRef, Prefetch
+from django.db.models import Exists, OuterRef, Prefetch, Sum
+
 from recipes.validators import hex_color_regex
 
 
@@ -37,6 +36,12 @@ class RecipeIngredient(models.Model):
     class Meta:
         verbose_name = 'Ингредиент рецепта'
         verbose_name_plural = 'Ингредиенты рецептов'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['recipe', 'ingredient', 'amount'],
+                name='unique_recipe_ingredient'
+            )
+        ]
 
     def __str__(self):
         return (f'Ингредиент для {self.recipe}, {self.ingredient.name},'
@@ -64,8 +69,10 @@ class RecipeQuerySet(models.QuerySet):
         fav_obj = Favorite.objects
         sh_car_obj = ShoppingCart.objects
         rec_ing_obj = RecipeIngredient.objects
-        favorites = Prefetch('favorites',
-                             queryset=fav_obj.select_related('user', 'recipe'))
+        favorites = Prefetch(
+            'favorites',
+            queryset=fav_obj.select_related('user', 'recipe')
+        )
         shoping_cart = Prefetch(
             'shopping_cart',
             queryset=sh_car_obj.select_related('user', 'recipe')
@@ -74,11 +81,13 @@ class RecipeQuerySet(models.QuerySet):
             'recipe_ingredients',
             queryset=rec_ing_obj.select_related('recipe', 'ingredient')
         )
-        return self.select_related('author') \
-            .prefetch_related('tags', 'ingredients') \
-            .prefetch_related(favorites) \
-            .prefetch_related(shoping_cart) \
+        return (
+            self.select_related('author')
+            .prefetch_related('tags', 'ingredients')
+            .prefetch_related(favorites)
+            .prefetch_related(shoping_cart)
             .prefetch_related(recipe_ingredients)
+        )
 
     def annotate_is_favorited(self, user):
         return self.annotate(
@@ -115,13 +124,13 @@ class Recipe(models.Model):
 
     objects = RecipeQuerySet().as_manager()
 
-    def __str__(self):
-        return f'Рецепт: {self.name} от {self.author.username}'
-
     class Meta:
         ordering = ['-created_at']
         verbose_name = 'Рецепт'
         verbose_name_plural = 'Рецепты'
+
+    def __str__(self):
+        return f'Рецепт: {self.name} от {self.author.username}'
 
     @display(description="Кол-во добавлений в избранное")
     def favorite_count(self):
@@ -169,20 +178,20 @@ class ShoppingCart(models.Model):
 
     @classmethod
     def export(cls, user):
-        result = ["Список покупок:\n"]
-        total = defaultdict(int)
+        lines = ["Список покупок:\n"]
 
         recipe_ids = user.shopping_cart.values_list('recipe__id', flat=True)
-        contents = (RecipeIngredient.objects.filter(recipe_id__in=recipe_ids)
-                    .select_related('ingredient')
-                    .order_by('ingredient__name'))
-        for ingredient in contents:
-            total[ingredient.ingredient] += ingredient.amount
+        ing_obj = RecipeIngredient.objects.filter(recipe_id__in=recipe_ids)
+        ingredients = (
+            ing_obj.select_related('ingredient')
+            .values('ingredient__name', 'ingredient__measurement_unit')
+            .annotate(total_amount=Sum('amount'))
+            .order_by('ingredient__name')
+        )
 
-        for ingredient, amount in total.items():
-            result.append(
-                f'- {ingredient.name} — {amount} '
-                f'{ingredient.measurement_unit}'
-            )
+        for obj in ingredients:
+            lines.append(
+                f"- {obj['ingredient__name']} — {obj['total_amount']} "
+                f"{obj['ingredient__measurement_unit']}")
 
-        return '\n'.join(result)
+        return '\n'.join(lines)

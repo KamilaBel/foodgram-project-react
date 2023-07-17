@@ -2,6 +2,7 @@ from djoser.serializers import UserSerializer as _UserSerializer
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueTogetherValidator
+
 from users.models import Follow, User
 
 
@@ -38,6 +39,8 @@ class UserSubscriptionSerializer(UserSerializer):
         fields = UserSerializer.Meta.fields + ('recipes', 'recipes_count')
 
     def get_recipes(self, obj):
+        # Это сделано, чтобы не было циклического импорта:
+        # users.serializers и recipes.serializers взаимно зависят друг от друга
         from recipes.serializers import RecipeShortSerializer
 
         request = self.context.get('request')

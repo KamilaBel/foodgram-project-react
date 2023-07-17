@@ -1,9 +1,12 @@
+from collections import defaultdict
+
 from drf_extra_fields.fields import Base64ImageField
-from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
-                            ShoppingCart, Tag)
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
 from users.serializers import UserSerializer
+
+from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
+                            ShoppingCart, Tag)
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -42,8 +45,7 @@ class RecipeIngredientsSerializer(serializers.ModelSerializer):
 class RecipeShortSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
-        fields = (
-            'id', 'name', 'image', 'cooking_time')
+        fields = ('id', 'name', 'image', 'cooking_time')
 
 
 class RecipeListRetrieveSerializer(serializers.ModelSerializer):
@@ -101,15 +103,16 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         return instance
 
     def _attach_ingredients(self, recipe_obj, ingredients):
-        ingredients_to_append = []
+        unique_ingredients = defaultdict(int)
         for ing in ingredients:
-            ing_obj, amount = ing['ingredient'], ing['amount']
-            RecipeIngredient.objects.get_or_create(
-                recipe=recipe_obj,
-                ingredient=ing_obj,
-                amount=amount
-            )
-            ingredients_to_append.append(ing_obj)
+            unique_ingredients[ing['ingredient']] += ing['amount']
+
+        ingredients_to_append = []
+        for ingredient, amount in unique_ingredients.items():
+            RecipeIngredient.objects.get_or_create(recipe=recipe_obj,
+                                                   ingredient=ingredient,
+                                                   amount=amount)
+            ingredients_to_append.append(ingredient)
 
         recipe_obj.ingredients.set(ingredients_to_append)
 

@@ -1,5 +1,8 @@
+import os
+
 from django.contrib.auth.hashers import make_password
 from django.core.management import BaseCommand
+
 from users.models import User
 
 
@@ -12,7 +15,9 @@ class Command(BaseCommand):
             defaults={
                 'first_name': 'Иван',
                 'last_name': 'Сидоров',
-                'password': make_password('testmeplease'),
+                'password': make_password(
+                    os.environ.get('ADMIN_TEST_PASSWORD', 'testmeplease')
+                ),
                 'is_staff': True,
                 'is_superuser': True,
             })
